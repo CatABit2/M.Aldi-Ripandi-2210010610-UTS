@@ -11,6 +11,8 @@ import javax.swing.border.EmptyBorder;
 import javax.swing.event.DocumentEvent;
 import javax.swing.table.*;
 import java.awt.*;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.io.File;
 
 public class ResepFrame extends JFrame {
@@ -19,23 +21,24 @@ public class ResepFrame extends JFrame {
     private final JTable table;
     private final JTextField tfCari = new JTextField();
 
-public ResepFrame(ResepService service) {
-    super("Aplikasi Resep Masakan – UTS");
-    this.service = service;
-    this.model = new ResepTableModel(service.list());
-    this.table = new JTable(model);
+    public ResepFrame(ResepService service) {
+        super("Aplikasi Resep Masakan – UTS");
+        this.service = service;
+        this.model = new ResepTableModel(service.list());
+        this.table = new JTable(model);
 
-    // PILIH NIMBUS JIKA ADA, JANGAN DITIMPA LAGI
-    try {
-        boolean ok = false;
-        for (UIManager.LookAndFeelInfo info : UIManager.getInstalledLookAndFeels()) {
-            if ("Nimbus".equals(info.getName())) {
-                UIManager.setLookAndFeel(info.getClassName());
-                ok = true; break;
+        // pilih Nimbus kalau ada
+        try {
+            boolean ok = false;
+            for (UIManager.LookAndFeelInfo info : UIManager.getInstalledLookAndFeels()) {
+                if ("Nimbus".equals(info.getName())) {
+                    UIManager.setLookAndFeel(info.getClassName());
+                    ok = true;
+                    break;
+                }
             }
-        }
-        if (!ok) UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
-    } catch (Exception ignore) {}
+            if (!ok) UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+        } catch (Exception ignore) {}
 
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setLayout(new BorderLayout(0,0));
@@ -63,10 +66,12 @@ public ResepFrame(ResepService service) {
         ReadableButton bImport = priButton("Import TXT");
         ReadableButton bExport = priButton("Export TXT");
         ReadableButton bReload = secButton("Reload");
+        ReadableButton bView   = secButton("Lihat");
         ReadableButton bAdd    = priButton("Tambah");
         ReadableButton bEdit   = secButton("Ubah");
         ReadableButton bDel    = dangerButton("Hapus");
         topRight.add(bImport); topRight.add(bExport); topRight.add(bReload);
+        topRight.add(bView);
         topRight.add(new JSeparator(SwingConstants.VERTICAL));
         topRight.add(bAdd); topRight.add(bEdit); topRight.add(bDel);
 
@@ -90,11 +95,21 @@ public ResepFrame(ResepService service) {
         sp.setBorder(BorderFactory.createEmptyBorder());
         add(sp, BorderLayout.CENTER);
 
+        // double-click row = lihat
+        table.addMouseListener(new MouseAdapter() {
+            @Override public void mouseClicked(MouseEvent e) {
+                if (e.getClickCount() == 2 && SwingUtilities.isLeftMouseButton(e)) {
+                    onView();
+                }
+            }
+        });
+
         // ===== Events =====
         tfCari.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
             private void filter() {
                 String q = tfCari.getText().trim();
-                sorter.setRowFilter(q.isEmpty() ? null : RowFilter.regexFilter("(?i)" + java.util.regex.Pattern.quote(q)));
+                sorter.setRowFilter(q.isEmpty() ? null :
+                        RowFilter.regexFilter("(?i)" + java.util.regex.Pattern.quote(q)));
             }
             public void insertUpdate(DocumentEvent e) { filter(); }
             public void removeUpdate(DocumentEvent e) { filter(); }
@@ -107,9 +122,7 @@ public ResepFrame(ResepService service) {
         bReload.addActionListener(e -> onReload());
         bImport.addActionListener(e -> onImportTxt());
         bExport.addActionListener(e -> onExportTxt());
-
-        // contoh: kalau kamu mau nonaktifkan dulu sebagian tombol
-        // bAdd.setEnabled(false); bDel.setEnabled(false);  // teksnya tetap kebaca karena custom button
+        bView.addActionListener(e -> onView());
 
         setSize(1000, 600);
         setLocationRelativeTo(null);
@@ -120,6 +133,7 @@ public ResepFrame(ResepService service) {
         return v < 0 ? -1 : table.convertRowIndexToModel(v);
     }
 
+    // ====== actions ======
     private void onAdd() {
         ResepDialog dlg = new ResepDialog(this, null);
         dlg.setVisible(true);
@@ -139,6 +153,13 @@ public ResepFrame(ResepService service) {
             service.update(idx, dlg.getValue());
             model.setData(service.list());
         }
+    }
+
+    private void onView() {
+        int idx = selectedModelRow();
+        if (idx < 0) { JOptionPane.showMessageDialog(this, "Pilih baris dulu."); return; }
+        Resep current = model.getAt(idx);
+        new ResepViewDialog(this, current).setVisible(true);
     }
 
     private void onDel() {
@@ -226,7 +247,7 @@ public ResepFrame(ResepService service) {
                 setForeground(baseFg);
             } else {
                 setBackground(disabledBg);
-                setForeground(disabledFg); // ini yang bikin teks tetap kontras
+                setForeground(disabledFg);
             }
         }
     }
